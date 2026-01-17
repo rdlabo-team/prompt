@@ -92,13 +92,18 @@ jobs:
                 --arg body "Devin session started for ${{ matrix.github_repo }}: $SESSION_URL" \
                 '{body: $body}')
               
-              curl -s -X POST \
+              COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
                 -H "Authorization: Bearer $GH_TOKEN" \
                 -H "Content-Type: application/json" \
                 https://api.github.com/repos/rdlabo-team/prompt/issues/22/comments \
-                -d "$COMMENT_PAYLOAD"
+                -d "$COMMENT_PAYLOAD")
               
-              echo "Posted comment to issue #22"
+              COMMENT_HTTP_CODE=$(echo "$COMMENT_RESPONSE" | tail -n1)
+              if [ "$COMMENT_HTTP_CODE" = "201" ]; then
+                echo "Posted comment to issue #22"
+              else
+                echo "Warning: Failed to post comment to issue #22. HTTP status: $COMMENT_HTTP_CODE"
+              fi
             else
               echo "Warning: Session URL not found in Devin API response"
             fi
