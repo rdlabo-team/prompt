@@ -19,7 +19,7 @@
 # Devin へのタスク
 
 ## Phase 1: Context Gathering（情報収集）
-- [ ] Sentry で 高優先度 & 未修正 の Issue を検索し、上位 3 件を抽出
+- [ ] Sentry で 高優先度 & 未修正 の Issue を検索し、上位 1 件を抽出
 - [ ] 各 Issue について以下を整理
     - タイトル
     - Sentry Issue URL
