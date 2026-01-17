@@ -29,7 +29,7 @@ jobs:
           sed -e 's/{{SENTRY_ORG}}/${{ matrix.sentry_org }}/g' \
               -e 's/{{SENTRY_PROJECTS}}/${{ matrix.sentry_projects }}/g' \
               -e 's/{{GITHUB_REPO}}/${{ matrix.github_repo }}/g' \
-              sentry-triage.md > instruction.md
+              SENTRY_TRIAGE.md > instruction.md
           cat instruction.md
 
       - name: Create GitHub Issue for Devin
