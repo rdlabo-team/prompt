@@ -16,9 +16,9 @@ jobs:
           - sentry_org: rdlabo
             sentry_projects: tipsys-api,tipsys-app
             github_repo: rdlabo-team/tipsys
-          - sentry_org: odss
-            sentry_projects: odss-mobile-api,odss-mobile-app
-            github_repo: odss-team/odss-mobile
+          - sentry_org: rdlabo
+            sentry_projects: foodlabel-api,foodlabel-app
+            github_repo: rdlabo-team/foodlabel
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
