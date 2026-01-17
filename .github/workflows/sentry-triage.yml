@@ -37,37 +37,13 @@ jobs:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create GitHub Issue with the instruction using jq for proper JSON encoding
+          # Read instruction content
           ISSUE_BODY=$(cat instruction.md)
-          ISSUE_PAYLOAD=$(jq -n \
-            --arg title "Sentry 高優先度・未修正 Issue を収集して GitHub Issue 化（Devin 用指示書）" \
-            --arg body "$ISSUE_BODY" \
-            --argjson labels '["devin"]' \
-            '{title: $title, body: $body, labels: $labels}')
           
-          ISSUE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Content-Type: application/json" \
-            https://api.github.com/repos/${{ matrix.github_repo }}/issues \
-            -d "$ISSUE_PAYLOAD")
-          
-          HTTP_CODE=$(echo "$ISSUE_RESPONSE" | tail -n1)
-          ISSUE_BODY_RESPONSE=$(echo "$ISSUE_RESPONSE" | sed '$d')
-          
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "Failed to create issue. HTTP status: $HTTP_CODE"
-            echo "Response: $ISSUE_BODY_RESPONSE"
-            exit 1
-          fi
-          
-          ISSUE_NUMBER=$(echo "$ISSUE_BODY_RESPONSE" | jq -r '.number')
-          ISSUE_URL=$(echo "$ISSUE_BODY_RESPONSE" | jq -r '.html_url')
-          echo "Created issue: $ISSUE_URL"
-          
-          # Start Devin session using jq for proper JSON encoding
+          # Start Devin session with instruction content directly as prompt
           DEVIN_PAYLOAD=$(jq -n \
-            --arg prompt "${ISSUE_URL} の指示に従ってタスクを実行してください。" \
-            --arg title "Sentry Triage - Scheduled Run" \
+            --arg prompt "$ISSUE_BODY" \
+            --arg title "Sentry Triage - ${{ matrix.github_repo }}" \
             --argjson tags '["sentry-triage", "automated"]' \
             '{prompt: $prompt, title: $title, tags: $tags}')
           
