@@ -37,41 +37,71 @@ jobs:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create GitHub Issue with the instruction
+          # Create GitHub Issue with the instruction using jq for proper JSON encoding
           ISSUE_BODY=$(cat instruction.md)
-          ISSUE_RESPONSE=$(curl -s -X POST \
+          ISSUE_PAYLOAD=$(jq -n \
+            --arg title "Sentry 高優先度・未修正 Issue を収集して GitHub Issue 化（Devin 用指示書）" \
+            --arg body "$ISSUE_BODY" \
+            --argjson labels '["devin"]' \
+            '{title: $title, body: $body, labels: $labels}')
+          
+          ISSUE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Content-Type: application/json" \
             https://api.github.com/repos/${{ matrix.github_repo }}/issues \
-            -d "{
-              \"title\": \"Sentry 高優先度・未修正 Issue を収集して GitHub Issue 化（Devin 用指示書）\",
-              \"body\": $(echo "$ISSUE_BODY" | jq -Rs .),
-              \"labels\": [\"devin\"]
-            }")
+            -d "$ISSUE_PAYLOAD")
           
-          ISSUE_NUMBER=$(echo $ISSUE_RESPONSE | jq -r '.number')
-          ISSUE_URL=$(echo $ISSUE_RESPONSE | jq -r '.html_url')
+          HTTP_CODE=$(echo "$ISSUE_RESPONSE" | tail -n1)
+          ISSUE_BODY_RESPONSE=$(echo "$ISSUE_RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "Failed to create issue. HTTP status: $HTTP_CODE"
+            echo "Response: $ISSUE_BODY_RESPONSE"
+            exit 1
+          fi
+          
+          ISSUE_NUMBER=$(echo "$ISSUE_BODY_RESPONSE" | jq -r '.number')
+          ISSUE_URL=$(echo "$ISSUE_BODY_RESPONSE" | jq -r '.html_url')
           echo "Created issue: $ISSUE_URL"
           
-          # Start Devin session
-          RESPONSE=$(curl -s -X POST https://api.devin.ai/v1/sessions \
+          # Start Devin session using jq for proper JSON encoding
+          DEVIN_PAYLOAD=$(jq -n \
+            --arg prompt "${ISSUE_URL} の指示に従ってタスクを実行してください。" \
+            --arg title "Sentry Triage - Scheduled Run" \
+            --argjson tags '["sentry-triage", "automated"]' \
+            '{prompt: $prompt, title: $title, tags: $tags}')
+          
+          DEVIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            https://api.devin.ai/v1/sessions \
             -H "Authorization: Bearer $DEVIN_API_KEY" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"prompt\": \"$ISSUE_URL の指示に従ってタスクを実行してください。\",
-              \"title\": \"Sentry Triage - Scheduled Run\",
-              \"tags\": [\"sentry-triage\", \"automated\"]
-            }")
-
-          echo "Response: $RESPONSE"
-          SESSION_URL=$(echo $RESPONSE | jq -r '.url')
-          echo "Devin Session: $SESSION_URL"
-
-          # Comment session URL on issue #22 in rdlabo-team/prompt
-          if [ "$SESSION_URL" != "null" ]; then
-            curl -s -X POST \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H "Content-Type: application/json" \
-              https://api.github.com/repos/rdlabo-team/prompt/issues/22/comments \
-              -d "{\"body\": \"Devin session started for ${{ matrix.github_repo }}: $SESSION_URL\"}"
+            -d "$DEVIN_PAYLOAD")
+          
+          DEVIN_HTTP_CODE=$(echo "$DEVIN_RESPONSE" | tail -n1)
+          DEVIN_BODY_RESPONSE=$(echo "$DEVIN_RESPONSE" | sed '$d')
+          
+          echo "Devin API Response (HTTP $DEVIN_HTTP_CODE): $DEVIN_BODY_RESPONSE"
+          
+          if [ "$DEVIN_HTTP_CODE" = "200" ] || [ "$DEVIN_HTTP_CODE" = "201" ]; then
+            SESSION_URL=$(echo "$DEVIN_BODY_RESPONSE" | jq -r '.url')
+            if [ "$SESSION_URL" != "null" ] && [ -n "$SESSION_URL" ]; then
+              echo "Devin Session: $SESSION_URL"
+              
+              # Comment session URL on issue #22 in rdlabo-team/prompt
+              COMMENT_PAYLOAD=$(jq -n \
+                --arg body "Devin session started for ${{ matrix.github_repo }}: $SESSION_URL" \
+                '{body: $body}')
+              
+              curl -s -X POST \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Content-Type: application/json" \
+                https://api.github.com/repos/rdlabo-team/prompt/issues/22/comments \
+                -d "$COMMENT_PAYLOAD"
+              
+              echo "Posted comment to issue #22"
+            else
+              echo "Warning: Session URL not found in Devin API response"
+            fi
+          else
+            echo "Warning: Devin API call failed with status $DEVIN_HTTP_CODE"
           fi
