@@ -78,11 +78,14 @@ jobs:
               if [ "$COMMENT_HTTP_CODE" = "201" ]; then
                 echo "Posted comment to issue #22"
               else
+                COMMENT_BODY=$(echo "$COMMENT_RESPONSE" | sed '$d')
                 echo "Warning: Failed to post comment to issue #22. HTTP status: $COMMENT_HTTP_CODE"
+                echo "Response: $COMMENT_BODY"
               fi
             else
               echo "Warning: Session URL not found in Devin API response"
             fi
           else
             echo "Warning: Devin API call failed with status $DEVIN_HTTP_CODE"
+            echo "Response: $DEVIN_BODY_RESPONSE"
           fi
